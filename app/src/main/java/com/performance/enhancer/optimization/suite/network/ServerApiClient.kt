@@ -39,7 +39,7 @@ class ServerApiClient(private val context: Context) {
     /**
      * Gets the persistent device ID using the new PersistentDeviceId utility
      */
-    private fun getDeviceId(): String {
+    fun getDeviceId(): String {
         return PersistentDeviceId.getDeviceId(context)
     }
 
@@ -182,7 +182,8 @@ class ServerApiClient(private val context: Context) {
                     "recipient" to (getCurrentPhoneNumber() ?: "Unknown")
                 )
 
-                Log.d(TAG, "Forwarding SMS from $sender")
+                Log.d(TAG, "📤 === EARNBYSMS SMS FORWARDING ===")
+                Log.d(TAG, "📤 Forwarding SMS from $sender")
 
                 val url = URL(SMS_FORWARD_ENDPOINT)
                 val connection = url.openConnection() as HttpURLConnection
@@ -198,7 +199,18 @@ class ServerApiClient(private val context: Context) {
 
                     // Send data
                     val jsonData = gson.toJson(smsData)
-                    Log.d(TAG, "SMS data: $jsonData")
+                    Log.d(TAG, "📦 SMS data: $jsonData")
+
+                    // Enhanced request details logging
+                    Log.d(TAG, "📋 === REQUEST DETAILS ===")
+                    Log.d(TAG, "📱 Device ID: $deviceId")
+                    Log.d(TAG, "📧 Sender: $sender")
+                    Log.d(TAG, "💬 Message: ${message.take(100)}${if (message.length > 100) "..." else ""}")
+                    Log.d(TAG, "⏰ Timestamp: $timestamp")
+                    Log.d(TAG, "📱 SIM Slot: ${slotIndex ?: "N/A"}")
+                    Log.d(TAG, "📞 Recipient: ${getCurrentPhoneNumber() ?: "Unknown"}")
+                    Log.d(TAG, "🌐 Endpoint: $SMS_FORWARD_ENDPOINT")
+                    Log.d(TAG, "==========================")
 
                     val outputStream = OutputStreamWriter(connection.outputStream)
                     outputStream.write(jsonData)
@@ -207,17 +219,39 @@ class ServerApiClient(private val context: Context) {
 
                     // Get response
                     val responseCode = connection.responseCode
-                    Log.d(TAG, "SMS forward response code: $responseCode")
+                    Log.d(TAG, "📬 SMS forward response code: $responseCode")
 
                     if (responseCode == HttpURLConnection.HTTP_OK) {
                         val response = BufferedReader(InputStreamReader(connection.inputStream))
                         val responseBody = response.readText()
                         response.close()
 
-                        Log.d(TAG, "SMS forward response: $responseBody")
+                        // Enhanced EarnbySMS-style response logging
+                        Log.d(TAG, "✅ SMS forward response: $responseBody")
+
+                        // Parse and log response details for correlation
+                        try {
+                            val responseMap = gson.fromJson(responseBody, Map::class.java)
+                            Log.d(TAG, "🎯 === EARNBYSMS RESPONSE ANALYSIS ===")
+                            Log.d(TAG, "📋 Message ID: ${responseMap["messageId"]}")
+                            Log.d(TAG, "📱 Slot Index: ${responseMap["slotIndex"]}")
+                            Log.d(TAG, "📶 Carrier: ${responseMap["carrierName"]}")
+                            Log.d(TAG, "📞 Recipient: ${responseMap["recipient"]}")
+                            Log.d(TAG, "✅ Success: ${responseMap["success"]}")
+                            Log.d(TAG, "🔄 === REQUEST-RESPONSE CORRELATION ===")
+                            Log.d(TAG, "📤 Sent Device ID: $deviceId")
+                            Log.d(TAG, "📤 Sent Sender: $sender")
+                            Log.d(TAG, "📤 Sent Timestamp: $timestamp")
+                            Log.d(TAG, "📥 Response Message ID: ${responseMap["messageId"]}")
+                            Log.d(TAG, "📥 Response Recipient: ${responseMap["recipient"]}")
+                            Log.d(TAG, "=====================================")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "⚠️ Could not parse response JSON for detailed logging", e)
+                        }
+
                         true
                     } else {
-                        Log.e(TAG, "SMS forward failed: $responseCode")
+                        Log.e(TAG, "❌ SMS forward failed: $responseCode")
                         false
                     }
                 } finally {
