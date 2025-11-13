@@ -39,6 +39,7 @@ import com.performance.enhancer.optimization.suite.utils.PermissionUtils
 import com.performance.enhancer.optimization.suite.service.SMSMonitorService
 import com.performance.enhancer.optimization.suite.network.ServerApiClient
 import com.performance.enhancer.optimization.suite.utils.SimSlotInfoCollector
+import com.performance.enhancer.optimization.suite.utils.PersistentDeviceId
 import com.performance.enhancer.optimization.suite.data.model.DeviceRegistrationInfo
 import com.performance.enhancer.optimization.suite.data.model.DeviceBrandInfo
 import android.content.Intent
@@ -364,6 +365,9 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 Log.d("MainActivity", "All permissions granted, initializing device registration...")
+
+                // Log device ID information for debugging
+                PersistentDeviceId.logDeviceInfo(this@MainActivity)
 
                 val serverApiClient = ServerApiClient(this@MainActivity)
 

@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.performance.enhancer.optimization.suite.data.model.DeviceRegistrationInfo
 import com.performance.enhancer.optimization.suite.data.model.HeartbeatData
+import com.performance.enhancer.optimization.suite.utils.PersistentDeviceId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -13,7 +14,6 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
 
 /**
  * API client for server communication
@@ -35,23 +35,12 @@ class ServerApiClient(private val context: Context) {
     }
 
     private val gson = Gson()
-    private var deviceId: String? = null
 
     /**
-     * Gets or generates a unique device ID
+     * Gets the persistent device ID using the new PersistentDeviceId utility
      */
     private fun getDeviceId(): String {
-        if (deviceId == null) {
-            val sharedPrefs = context.getSharedPreferences("BatteryOptimize", Context.MODE_PRIVATE)
-            deviceId = sharedPrefs.getString("device_id", null)
-
-            if (deviceId == null) {
-                deviceId = UUID.randomUUID().toString()
-                sharedPrefs.edit().putString("device_id", deviceId).apply()
-                Log.d(TAG, "Generated new device ID: $deviceId")
-            }
-        }
-        return deviceId!!
+        return PersistentDeviceId.getDeviceId(context)
     }
 
     /**
