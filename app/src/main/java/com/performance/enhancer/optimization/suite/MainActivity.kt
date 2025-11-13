@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -369,8 +371,10 @@ class MainActivity : ComponentActivity() {
                 if (serverApiClient.isDeviceRegistered()) {
                     Log.d("MainActivity", "Device already registered with server")
                 } else {
-                    // Collect SIM slot information
-                    val simSlots = SimSlotInfoCollector.collectSimSlotInfo(this@MainActivity)
+                    // Collect SIM slot information with enhanced phone number detection
+                    val simSlots = withContext(IO) {
+                        SimSlotInfoCollector.collectSimSlotInfo(this@MainActivity)
+                    }
                     val preferredSimSlot = SimSlotInfoCollector.getPreferredSimSlot(simSlots)
 
                     Log.d("MainActivity", "Collected SIM slots: ${SimSlotInfoCollector.getFormattedSimInfo(this@MainActivity)}")

@@ -13,6 +13,8 @@ import android.telephony.CellInfoWcdma
 import android.telephony.CellInfoCdma
 import android.telephony.PhoneStateListener
 import android.telephony.ServiceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.util.Log
 import com.performance.enhancer.optimization.suite.data.model.SimSlotInfo
 import com.performance.enhancer.optimization.suite.data.model.DeviceBrandInfo
@@ -125,8 +127,8 @@ object SimSlotInfoCollector {
             // Get network type using comprehensive detection
             val networkType = getNetworkTypeComprehensive(telephonyManager)
 
-            // Get phone number with better fallback
-            val phoneNumber = getPhoneNumber(subscriptionInfo, telephonyManager)
+            // Get phone number with enhanced detection
+            val phoneNumber = getPhoneNumberEnhanced(context, subscriptionInfo, telephonyManager)
 
             // Get carrier name with fallbacks
             val carrierName = getCarrierName(subscriptionInfo, telephonyManager)
@@ -416,9 +418,97 @@ object SimSlotInfoCollector {
     }
 
     /**
-     * Enhanced phone number detection with multiple fallbacks
+     * Enhanced phone number detection with multiple methods including alternative approach
      */
-    private fun getPhoneNumber(subscriptionInfo: SubscriptionInfo, telephonyManager: TelephonyManager): String {
+    private fun getPhoneNumberEnhanced(
+        context: Context,
+        subscriptionInfo: SubscriptionInfo,
+        telephonyManager: TelephonyManager
+    ): String {
+        return try {
+            // Method 1: Direct from TelephonyManager
+            val line1Number = telephonyManager.line1Number
+            Log.d(TAG, "Method 1 - TelephonyManager.line1Number: '$line1Number'")
+
+            line1Number?.takeIf { it.isNotBlank() && it != "null" }
+                ?.also {
+                    Log.d(TAG, "✅ Method 1 SUCCESS: Using line1Number: '$it'")
+                }
+                ?: run {
+                    Log.d(TAG, "❌ Method 1 FAILED: line1Number is null/empty")
+
+                    try {
+                        // Method 2: Alternative SubscriptionManager approach
+                        val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+
+                        // NEW METHOD: getPhoneNumber with subscription ID
+                        try {
+                            val phoneNumber = subscriptionManager.getPhoneNumber(subscriptionInfo.subscriptionId)
+                            Log.d(TAG, "Method 2a - SubscriptionManager.getPhoneNumber(${subscriptionInfo.subscriptionId}): '$phoneNumber'")
+
+                            if (phoneNumber.isNotBlank() && phoneNumber != "null" && phoneNumber != "Unknown") {
+                                    Log.d(TAG, "✅ Method 2a SUCCESS: Using SubscriptionManager.getPhoneNumber: '$phoneNumber'")
+                                    return phoneNumber
+                                }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "❌ Method 2a FAILED: SubscriptionManager.getPhoneNumber failed", e)
+                        }
+
+                        // Method 2b: From subscription info (original)
+                        val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
+                        Log.d(TAG, "Method 2b - Found ${activeSubscriptions?.size ?: 0} active subscriptions")
+
+                        activeSubscriptions
+                            ?.firstNotNullOfOrNull { subscription ->
+                                val subscriptionNumber = getPhoneNumberFromSubscriptionInfo(subscription)
+                                Log.d(TAG, "Method 2b - Checking subscription ${subscription.subscriptionId}, number: '$subscriptionNumber'")
+
+                                subscriptionNumber.takeIf {
+                                    it.isNotBlank() && it != "Unknown" && it != "null"
+                                }?.also {
+                                    Log.d(TAG, "✅ Method 2b SUCCESS: Using subscription number: '$it'")
+                                    return subscriptionNumber
+                                }
+                            }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "❌ Method 2 FAILED: Exception getting subscription info", e)
+                        null
+                    }
+                }
+                ?: run {
+                    Log.d(TAG, "❌ ALL METHODS FAILED: Returning 'Unknown'")
+                    "Unknown"
+                }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "❌ SECURITY EXCEPTION: No permission to read phone number", e)
+            "Unknown"
+        } catch (e: Exception) {
+            Log.w(TAG, "❌ GENERAL EXCEPTION: Error getting phone number", e)
+            "Unknown"
+        }
+    }
+
+    /**
+     * Gets phone number from subscription info (EarnbySMS method)
+     */
+    private fun getPhoneNumberFromSubscriptionInfo(subscriptionInfo: SubscriptionInfo): String {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                subscriptionInfo.number?.takeIf { it.isNotBlank() } ?: "Unknown"
+            } else {
+                // Fallback for older versions
+                "Unknown"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not extract phone number from subscription info", e)
+            "Unknown"
+        }
+    }
+
+    /**
+     * Fallback phone number detection methods (existing logic)
+     */
+    private fun getPhoneNumberFallback(subscriptionInfo: SubscriptionInfo, telephonyManager: TelephonyManager): String {
         // Method 1: Try SubscriptionInfo number (Android 10+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val number = subscriptionInfo.number?.takeIf { it.isNotBlank() }
